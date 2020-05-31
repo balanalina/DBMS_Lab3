@@ -1,0 +1,79 @@
+--create 4 scenarios that reproduce the following concurrency issues under pessimistic isolation levels: 
+--dirty reads, non-repeatable reads, phantom reads, and a deadlock; you can use stored procedures and / or stand-alone queries; 
+--find solutions to solve / workaround the concurrency issues
+USE GreenHouse
+GO
+
+--WE WILL USE TABLE Plant AND Gardener
+SELECT * FROM Plant
+
+--TRAN2
+
+----------------------DIRTY READS
+--UNSOLVED
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
+SELECT * FROM Plant
+WAITFOR DELAY '00:00:15'
+SELECT * FROM Plant
+
+--SOLVED
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED
+SELECT * FROM Plant
+WAITFOR DELAY '00:00:15'
+SELECT * FROM Plant
+
+
+----------------------NON-REPEATABLE READS
+--UNSOLVED
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED
+BEGIN TRAN
+SELECT * FROM Plant
+WAITFOR DELAY '00:00:15'
+SELECT * FROM Plant
+COMMIT TRAN
+
+--SOLVED
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ
+BEGIN TRAN
+SELECT * FROM Plant
+WAITFOR DELAY '00:00:15'
+SELECT * FROM Plant
+COMMIT TRAN
+
+
+----------------------PHANTOM READS
+--UNSOLVED
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ
+BEGIN TRAN
+SELECT * FROM Plant
+WAITFOR DELAY '00:00:15'
+SELECT * FROM Plant
+COMMIT TRAN
+
+--SOLVED
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE
+BEGIN TRAN
+SELECT * FROM Plant
+WAITFOR DELAY '00:00:15'
+SELECT * FROM Plant
+COMMIT TRAN
+
+
+----------------------DEADLOCK
+--UNSOLVED -- VICTIM
+SET DEADLOCK_PRIORITY HIGH
+BEGIN TRAN
+UPDATE Gardener SET name='TRAN 2' WHERE age=30
+WAITFOR DELAY '00:00:10'
+UPDATE Plant SET name='TRAN 2' WHERE type='Swamp Plants'
+COMMIT TRAN
+
+--SOLVED -- WINNER
+BEGIN TRAN
+UPDATE Plant SET name='TRAN 1' WHERE type='Swamp Plants'
+WAITFOR DELAY '00:00:10'
+UPDATE Gardener SET name='TRAN 1' WHERE age=30
+COMMIT TRAN
+
+SELECT * FROM Plant
+SELECT * FROM Gardener
